@@ -7,6 +7,8 @@
 // Inicio : 06/09/2022
 // Ultima modificacao : 12/09/2022 21:40
 //
+// shaders - incompleto
+//
 //*******************************************************
 
 #include "funcoes.cpp"
@@ -18,7 +20,7 @@
 #include <cstdio>
 #include <string.h>
 
-#include<superficie.h>
+#include "superficie.h"
 
 #include <gl/glut.h>
 
@@ -39,7 +41,7 @@ void atualiza_posicao_camera( void );                                   // atual
 void especifica_parametros_visualizacao_help( void );                   // especifica a projecao ortogonal do help
 void define_iluminacao( void );                                         // define os parametros de iluminacao
 void especifica_parametros_visualizacao( void );                        // configura a perspectiva e posiciona a camera
-void plota_vertice( GLint vertice_linha , GLint vertice_profundidade ); // desenha um determinado vertice com sua respectiva cor
+void desenha_face( GLint indice );                                      // desenha uma determinada face
 void desenha( void );                                                   // funcao responsavel pelo desenho da cena
 void inicializa( void );                                                // inicializa todas as variaveis e estados
 int  LoadBMP( void );                                                   // le um arquivo bmp e aoca um vetor com todos os valores dos pixels
@@ -120,7 +122,7 @@ void calcula_normal(  GLfloat v1[ 3 ] , GLfloat v2[ 3 ] , GLfloat v3[ 3 ] )
 void atualiza_posicao_camera()
 {
     //configurar a posicao inicial da camera levando em consideracao o tamanho do terreno
-    camera.posz = terreno.profundidade_superficie()*8;
+    camera.posz = terreno.largura_superficie()*25;
     especifica_parametros_visualizacao();
 }
 
@@ -128,8 +130,6 @@ void atualiza_posicao_camera()
 // le um arquivo bmp e aoca um vetor com todos os valores dos pixels
 int  LoadBMP()
 {
-
-
     #define SAIR        {fclose(fp_arquivo); return -1;}
     #define CTOI(C)     (*(int*)&C)
 
@@ -156,8 +156,10 @@ int  LoadBMP()
     largura_imagem = CTOI(Header[0x12]);
     altura_imagem  = CTOI(Header[0x16]);
 
-    terreno.seta_tamanho( altura_imagem , largura_imagem  );    //seta o tamanho do terreno (altura da imagem  = largura da superficie)
+    //terreno.seta_tamanho( altura_imagem , largura_imagem  );    //seta o tamanho do terreno (altura da imagem  = largura da superficie)
+    terreno.seta_tamanho( largura_imagem , altura_imagem  );    //seta o tamanho do terreno (altura da imagem  = largura da superficie)
                                                                 //                          (largura da imagem = largura da superficie)
+
     //Verifica a profundidade de cores
     switch( CTOI(Header[0x1C]) )
     {
@@ -179,14 +181,14 @@ int  LoadBMP()
     }
 
     // Efetura a Carga da Imagem
-    image = (GLubyte *) malloc ( imageSize );
+    image = ( GLubyte *) malloc ( imageSize );
 
-    retorno = fread(image,1,imageSize,fp_arquivo);
+    retorno = fread( image , 1 , imageSize , fp_arquivo );
 
-    if (retorno != (GLint)(imageSize))
+    if ( retorno != (GLint)( imageSize ))
     {
         free (image);
-        cout << "ERRO5 Erro na leitura da quantidade de bytes da imagem especificada" << endl;
+        cout << "ERRO Erro na leitura da quantidade de bytes da imagem especificada" << endl;
         SAIR;
     }
 
@@ -205,42 +207,113 @@ int  LoadBMP()
 // cria a matriz terreno com os valores de cada pixel
 int cria_terreno()
 {
-    GLsizei step = 0;
+    GLsizei step = 0 , x = 0 , z = 0 , indice = 0 , pulo , deltax , deltaz;
 
     if( LoadBMP() == -1)  // carrega a imagem e verifica se deu certo o carregamento
         return -1;
 
     terreno.cria_vertices(); // cria a a matriz de vertices dentro do objeto
 
-    for (GLint i = 0; i < terreno.largura_superficie() ; i++)           // percorre a largura da matriz imagem (linhas)
-        for (GLint j = 0; j < terreno.profundidade_superficie() ; j++)  // percorre a altura  da matriz imagem (colunas)
+    // para centralizar o terreno no SRU
+    deltax = terreno.profundidade_superficie() / 2;
+    deltaz = terreno.largura_superficie() / 2;
+
+    // adiciona todos os pontos da imagem no vetor de vertices do objeto. o y do vertice eh a cor do ponto na imagem
+    for ( GLint i = 0 ; i < terreno.quantidade_vertices() ; i++ )
+    {
+        terreno.inclui_vertices( i , x-deltax , (GLint)image[ step ] , z-deltaz );
+
+        step += (profundidade_cores/8);
+        z++;
+        if( ( z % terreno.largura_superficie() ) == 0)
         {
-            terreno.inclui_coordenada( i , j , (GLint)image[ step ] );  // insere a cor de cada posicao da matriz (posicao x,y da matriz - posicao x,z do plano de coordenadas)
-            step += (profundidade_cores/8);                             // pulo dentro do vetor image (vai depende da profundidade de cores da imagem)
-        }                                                               // caso a imagem tiver mais que 8 bits (mono) converte em omo pegando o valor de red como a cor
+            x++;
+            z = 0;
+        }
+    }
+
+    terreno.cria_faces(); // cria a matriz de faces dentro do objeto
+
+    indice = 0;
+    pulo = terreno.largura_superficie()-1;
+
+    // adiciona as faces triangulares
+    // cada 4 pontos são dois triangulos. aqui adiciona o "inferior"
+    for( int i = 0 ; i < terreno.quantidade_vertices()-terreno.largura_superficie() ; i++ )
+    {
+        if( i == pulo )
+        {
+            pulo += terreno.largura_superficie();
+            continue;
+        }
+        terreno.inclui_faces( indice , i , i+1 , i+terreno.largura_superficie() );
+
+        indice++;
+    }
+
+    pulo = terreno.largura_superficie()-1;
+
+    // cada 4 pontos são dois triangulos. aqui adiciona o "superior"
+    for( int i = 1 ; i <= terreno.quantidade_vertices()-terreno.largura_superficie() ; i++ )
+    {
+        if( i == pulo+1 )
+        {
+            pulo += terreno.largura_superficie();
+            continue;
+        }
+        terreno.inclui_faces( indice , i , i+terreno.largura_superficie() , i+terreno.largura_superficie()-1 );
+
+        indice++;
+    }
+
     atualiza_posicao_camera();
     free( image );
+
     return 1;
 }
 /// =======================================================================
 // desenha um determinado vertice com sua respectiva cor
-void plota_vertice( GLint vertice_linha , GLint vertice_profundidade )
+void desenha_face( GLint indice  )
 {
-    GLint superficie_largura      = terreno.largura_superficie() ,
-          superficie_profundidade = terreno.profundidade_superficie();
+    // melhorar a codificacao. retornar vetor de inteiros da classe
+    // MELHORAR MUITO ESTE TRECHO DO CÓDIGO
+
+    GLfloat v1[ 3 ] , v2[ 3 ] , v3[ 3 ];
+
+    v1[0] = terreno.retorna_vertices_x( terreno.retorna_faces_v1( indice ) );
+    v1[1] = terreno.retorna_vertices_y( terreno.retorna_faces_v1( indice ) );
+    v1[2] = terreno.retorna_vertices_z( terreno.retorna_faces_v1( indice ) );
+
+    v2[0] = terreno.retorna_vertices_x( terreno.retorna_faces_v2( indice ) );
+    v2[1] = terreno.retorna_vertices_y( terreno.retorna_faces_v2( indice ) );
+    v2[2] = terreno.retorna_vertices_z( terreno.retorna_faces_v2( indice ) );
+
+    v3[0] = terreno.retorna_vertices_x( terreno.retorna_faces_v3( indice ) );
+    v3[1] = terreno.retorna_vertices_y( terreno.retorna_faces_v3( indice ) );
+    v3[2] = terreno.retorna_vertices_z( terreno.retorna_faces_v3( indice ) );
+
+
+    calcula_normal( v1 , v2 , v3 );
+    glNormal3fv( normal );
+
 
     if ( color )
-        glColor3fv( coloracao[ ( 12 * terreno.valor( vertice_linha , vertice_profundidade ) / 256 ) ] );
+        glColor3fv( coloracao[ ( 12 * terreno.retorna_vertices_y( terreno.retorna_faces_v1 ( indice ) ) / 256 ) ] );
+    glVertex3fv( v1 );
 
-    glVertex3d( vertice_linha-superficie_largura/2 , terreno.valor( vertice_linha , vertice_profundidade ) ,  vertice_profundidade-superficie_profundidade/2 );
+    if ( color )
+        glColor3fv( coloracao[ ( 12 * terreno.retorna_vertices_y( terreno.retorna_faces_v2 ( indice ) ) / 256 ) ] );
+    glVertex3fv( v2 );
+
+    if ( color )
+        glColor3fv( coloracao[ ( 12 * terreno.retorna_vertices_y( terreno.retorna_faces_v3 ( indice ) ) / 256 ) ] );
+    glVertex3fv( v3 );
 
 }
 /// =======================================================================
 // funcao responsavel pelo desenho da cena
 void desenha(void)
 {
-    GLfloat v[ 3 ][ 3 ];
-
     glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 
     glMatrixMode(GL_MODELVIEW);
@@ -251,10 +324,11 @@ void desenha(void)
     glRotatef( transf.angx , 1 , 0 , 0 );
     glRotatef( transf.angy , 0 , 1 , 0 );
     glRotatef( transf.angz , 0 , 0 , 1 );
-    glScalef( transf.sx+10 , transf.sy , transf.sz+10 );
+    glScalef( transf.sx+20 , transf.sy+2 , transf.sz+20 ); // para aumentar a visualizacao na tela
 
     define_iluminacao();
 
+    // se a iluminaca esta ligada ou nao
     (ligada)?  glEnable(GL_LIGHTING) : glDisable(GL_LIGHTING);
 
     if( mostra_eixos )
@@ -281,58 +355,23 @@ void desenha(void)
 
     glColor4f( 1.0 , 1.0 , 1.0 , 1.0 );
 
-    cout << "Modo : " << modo << endl;
+    // modo de visualizacao: pontos, arestas ou solido
+    if ( modo == 0 )
+        glPolygonMode(GL_FRONT_AND_BACK, GL_POINT );
+    else
+        if ( modo == 1 )
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE );
+        else
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL );
 
-    for( GLint l = 0 ; l <  terreno.largura_superficie() ; l++ )
+    // desenha as faces
+    for( int i = 0 ; i < terreno.quantidade_faces() ; i++)
     {
-        for( GLint p = 0 ; p <  terreno.profundidade_superficie() ; p++ )
-        {
-            //sentido anti-horario
-            // ultima linha e coluna de pontos : para não estourar o limite da matriz (tem que fazer linhas aqi - se der tempo)
-            if ( (  modo != 0 ) && ( p == terreno.profundidade_superficie()-1 || l == terreno.largura_superficie()-1 ) )
-                continue;
-
-            if ( modo == 0 )
-            {
-                glBegin( GL_POINTS );
-                    plota_vertice( l , p );
-                glEnd();
-            }
-            else
-            {
-                if ( modo == 1 )
-                    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE );
-                else
-                    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL );
-                /*
-                v [ 0 ][ 0 ] = l   ; v[ 0 ][ 1 ] = terreno.valor( l   , p   ) ; v[ 0 ][ 2 ] = p;
-                v [ 0 ][ 0 ] = l   ; v[ 0 ][ 1 ] = terreno.valor( l   , p+1 ) ; v[ 0 ][ 2 ] = p+1;
-                v [ 0 ][ 0 ] = l+1 ; v[ 0 ][ 1 ] = terreno.valor( l+1 , p   ) ; v[ 0 ][ 2 ] = p;
-
-                calcula_normal( v[ 0 ] , v[ 1 ] , v[ 2 ] );
-                glNormal3fv( normal );
-                */
-                glBegin( GL_TRIANGLES );
-                    plota_vertice( l   , p   );
-                    plota_vertice( l   , p+1 );
-                    plota_vertice( l+1 , p   );
-                glEnd();
-                /*
-                v [ 0 ][ 0 ] = l   ; v[ 0 ][ 1 ] = terreno.valor( l   , p+1 ) ; v[ 0 ][ 2 ] = p+1;
-                v [ 0 ][ 0 ] = l+1 ; v[ 0 ][ 1 ] = terreno.valor( l+1 , p+1 ) ; v[ 0 ][ 2 ] = p+1;
-                v [ 0 ][ 0 ] = l+1 ; v[ 0 ][ 1 ] = terreno.valor( l+1 , p   ) ; v[ 0 ][ 2 ] = p;
-
-                calcula_normal( v[ 0 ] , v[ 1 ] , v[ 2 ] );
-                glNormal3fv( normal );
-                */
-                glBegin( GL_TRIANGLES );
-                    plota_vertice( l   , p+1 );
-                    plota_vertice( l+1 , p+1 );
-                    plota_vertice( l+1 , p   );
-                glEnd();
-            }
-        }
+        glBegin( GL_TRIANGLES );
+            desenha_face( i );
+        glEnd();
     }
+
     glPopMatrix();
 
     glutSwapBuffers();
@@ -354,8 +393,8 @@ void inicializa( void )
     transf.angz   = 0.0;
 
     camera.posx   = 0;
-    camera.posy   = 128;
-    camera.posz   = terreno.profundidade_superficie()*8;
+    camera.posy   = 1000;
+    camera.posz   = terreno.largura_superficie()*10;
     camera.alvox  = 0;
     camera.alvoy  = 128;
     camera.alvoz  = 0;
@@ -363,7 +402,7 @@ void inicializa( void )
     camera.fim    = 100000.0;
     camera.ang    = 45;
 
-    tonalizacao   = 'M';
+    tonalizacao   = 'S';
     modo          = 1;
     color         = true;
     mostra_eixos  = false;
@@ -390,9 +429,9 @@ void inicializa( void )
     luz.especular[ 3 ] = 1.0;
 
     // posicao
-    luz.posicao[ 0 ] =   1000;
-    luz.posicao[ 1 ] =   1000;
-    luz.posicao[ 2 ] =   1000;
+    luz.posicao[ 0 ] =      0;
+    luz.posicao[ 1 ] =    300;
+    luz.posicao[ 2 ] =      0;
     luz.posicao[ 3 ] =    1.0;
 
     // capacidade de brilho do material
@@ -524,22 +563,22 @@ void teclado( GLubyte key , GLint x , GLint y )
             ligada = !ligada;
 
         if ( key == 'X' )
-            transf.angx += 5;
-
-        if ( key == 'x' )
             transf.angx -= 5;
 
-        if ( key == 'Y' )
-            transf.angy += 5;
+        if ( key == 'x' )
+            transf.angx += 5;
 
-        if ( key == 'y' )
+        if ( key == 'Y' )
             transf.angy -= 5;
 
+        if ( key == 'y' )
+            transf.angy += 5;
+
         if ( key == 'Z' )
-            transf.angz += 5;
+            transf.angz -= 5;
 
         if ( key == 'z' )
-            transf.angz -= 5;
+            transf.angz += 5;
     }
     especifica_parametros_visualizacao();
 
@@ -551,10 +590,9 @@ void teclado( GLubyte key , GLint x , GLint y )
 // Programa Principal
 int main( int argc , char *argv[] )
 {
-    /*
     if ( argc != 2 )
     {
-        cout << "faltou nome do arquivo a ser aberto" << endl;
+        cout << "Faltou nome do arquivo a ser aberto" << endl;
         return 0;
     }
     fp_arquivo = fopen(argv[1],"rb");
@@ -566,30 +604,13 @@ int main( int argc , char *argv[] )
     else
         cout << endl << "Sucesso na abertura do arquivo " << argv[1] << endl;
 
-*/
-    fp_arquivo = fopen("imagens\\entrada24bits.bmp","rb");
-    if ( !fp_arquivo )
-    {
-        cout << endl << "Nao pode abrir o arquivo " << endl;
-        return -1;
-    }
-    else
-        cout << endl << "Sucesso na abertura do arquivo " << endl;
-
-    // ESTA24.BMP"
-    // "circulos24bits.bmp" );
-    // "listras24bits.bmp" );
-    // "girassol24bits.bmp" );
-    // "entrada24bits.bmp" );
-    // "nova24bits.bmp" );
-
     glutInit( &argc , argv );
 
     glutInitDisplayMode( GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH );
 
     // janela do help
     glutInitWindowSize( LAR_HELP , ALT_HELP );
-    glutInitWindowPosition( 150 , 150 );
+    glutInitWindowPosition( 300 , 300 );
     jan[ 0 ] = glutCreateWindow( "HELP" );
 
     // janela principal

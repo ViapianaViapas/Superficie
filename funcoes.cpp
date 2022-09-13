@@ -89,18 +89,17 @@ void desenha_help(void)
     glClear( GL_COLOR_BUFFER_BIT );
     glColor4f( 1.0 , 1.0 , 0.0 , 1.0 );
 
-    mostra_texto_bitmap( 0 , 200 , "ESC           : finaliza o programa" );
-    mostra_texto_bitmap( 0 , 182 , "L             : liga/desliga iluminacao" );
-    mostra_texto_bitmap( 0 , 164 , "X x Y y Z z   : rotaciona a cena" );
-    mostra_texto_bitmap( 0 , 146 , "C             : liga/desliga coloracao" );
-    mostra_texto_bitmap( 0 , 128 , "E             : exibe/oculta eixos" );
-    mostra_texto_bitmap( 0 , 110 , "F             : alterna tonalizacao entre flat e smooth" );
-    mostra_texto_bitmap( 0 ,  93 , "ALT +         : aumenta o passo de movimento da camera" );
-    mostra_texto_bitmap( 0 ,  74 , "ALT -         : diminui o passo de movimento da camera" );
-    mostra_texto_bitmap( 0 ,  56 , "I             : reinicializa" );
-    mostra_texto_bitmap( 0 ,  38 , "M             : alterna entre pontos, wireframe e solido" );
-    mostra_texto_bitmap( 0 ,  20 , "TECLAS NAVEG. : movimenta a fonte de luz" );
-    mostra_texto_bitmap( 0 ,   2 , "W A S D Q \\   : movimenta a camera" );
+    mostra_texto_bitmap( 0 , 210 , "ESC           : finaliza o programa" );
+    mostra_texto_bitmap( 0 , 190 , "M             : alterna entre pontos, wireframe e solido" );
+    mostra_texto_bitmap( 0 , 170 , "L             : liga/desliga iluminacao" );
+    mostra_texto_bitmap( 0 , 150 , "X x Y y Z z   : rotaciona a cena" );
+    mostra_texto_bitmap( 0 , 130 , "C             : liga/desliga coloracao" );
+    mostra_texto_bitmap( 0 , 110 , "E             : exibe/oculta eixos" );
+    mostra_texto_bitmap( 0 ,  90 , "F             : alterna tonalizacao entre flat e smooth" );
+    mostra_texto_bitmap( 0 ,  70 , "W A S D Q \\   : movimenta a camera" );
+    mostra_texto_bitmap( 0 ,  50 , "TECLAS NAVEG. : movimenta a fonte de luz" );
+    mostra_texto_bitmap( 0 ,  30 , "MOUSE         : rotaciona a camera" );
+    mostra_texto_bitmap( 0 ,  10 , "I             : reinicializa" );
 
     glutSwapBuffers();
 }
@@ -119,6 +118,7 @@ void especifica_parametros_visualizacao_help( void )
 // reorganiza a janela de help quando modificada seu tamanho
 void altera_tamanho_janela_help( GLsizei largura , GLsizei altura )
 {
+    glutInitWindowPosition( 300 , 300 );
     glutReshapeWindow( LAR_HELP , ALT_HELP );
     especifica_parametros_visualizacao_help();
 }
@@ -130,10 +130,10 @@ void define_iluminacao( void )
     glEnable( GL_LIGHTING );
 
     // Define a refletância do material
-    glMaterialfv( GL_FRONT , GL_SPECULAR  , especularidade );
+    glMaterialfv( GL_FRONT_AND_BACK , GL_SPECULAR  , especularidade );
 
     // Define a concentração do brilho
-    glMateriali(  GL_FRONT , GL_SHININESS , espec_material );
+    glMateriali(  GL_FRONT_AND_BACK , GL_SHININESS , espec_material );
 
     // ativa o uso da luz ambiente - caso a luz 0 seja desligada
     glLightModelfv( GL_LIGHT_MODEL_AMBIENT , ambiente );
