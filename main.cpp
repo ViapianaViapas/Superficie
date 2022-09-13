@@ -1,17 +1,13 @@
-//*******************************************************
-//
-// Superficie
-//
-// Mapeamento de terreno a partir de uma imagem
-//
-// Inicio : 06/09/2022
-// Ultima modificacao : 12/09/2022 21:40
-//
-// shaders - incompleto
-//
-//*******************************************************
-
-#include "funcoes.cpp"
+///*******************************************************
+///
+/// Superficie
+///
+/// Mapeamento de terreno a partir de uma imagem
+///
+/// Inicio             : 06/09/2022
+/// Ultima modificacao : 12/09/2022 23:09
+///
+///*******************************************************
 
 #include <iostream>
 #include <cstdlib>
@@ -20,11 +16,21 @@
 #include <cstdio>
 #include <string.h>
 
-#include "superficie.h"
-
 #include <gl/glut.h>
 
 using namespace std;
+
+#define JANELAS         2
+
+#define LAR_MAIN        1120
+#define ALT_MAIN        630
+
+#define LAR_HELP        600
+#define ALT_HELP        225
+
+#define SENS_ROT        1.0
+#define SENS_OBS        100.0
+#define SENS_TRANSL     100.0
 
 ///===============================================================================================================
 /// PROTOTIPAGEM
@@ -48,6 +54,88 @@ int  LoadBMP( void );                                                   // le um
 void calcula_normal(  GLfloat v1[3] , GLfloat v2[3] , GLfloat v3[3] );  // calcula o vetor normal do triangulo
 void unitario( void );                                                  // Funcao que torna o vetor normal unitario
 int  cria_terreno( void );                                              // cria a matriz terreno com os valores de cada pixel
+///===============================================================================================================
+
+
+class superficie
+{
+    private:
+        int    largura;
+        int    profundidade;                 // altura na imagem, profundidade no terreno
+        int    qtde_vertices;                // quantidade de vertices da superfice
+        int    qtde_faces;                   // quantidade de faces triangulares da superficie
+        int    **vertices;                   // matriz com todos os vertices [0]->coord. x, [1]-> coord. z, valor na matriz -> coord. y
+        int    **faces;                      // faces triangulares - indices dos vertices que a compoem
+    public:
+        void   cria_vertices( void );                                     // cria a matriz vertices
+        void   cria_faces( void );                                        // cria o vetor de faces
+        void   inclui_faces( int indice , int v1 , int v2 , int v3 );     // inclui vertices na face
+        void   destroi_vertices( void );                                  // libera a memoria utiizada pela matriz vertices
+        void   destroi_faces( void );                                     // libera a memoria utiizada pela matriz faces
+        void   inclui_vertices( int indice , int x , int y , int valor ); // inclui valor na matriz de vertices
+        int    valor( int x , int y );                                    // retorna o valor de uma determinada posicao da matriz
+        void   seta_tamanho( int l , int a );                             // seta o tamanho da superficie
+        int    largura_superficie( void );                                // retorna a largura da superficie (eixo x)
+        int    profundidade_superficie( void );                           // retorna a profundidade da superficie (eixo y)
+        int    quantidade_faces( void );                                  // retorna a quantidade de faces da superficie
+        int    quantidade_vertices( void );                               // retorna a quantidade de vertices da superficie
+        int    retorna_faces_v1( int indice );                            // retorna v1 da face *MELHORAR*
+        int    retorna_faces_v2( int indice );                            // retorna v2 da face *MELHORAR*
+        int    retorna_faces_v3( int indice );                            // retorna v3 da face *MELHORAR*
+        int    retorna_vertices_x( int indice );                          // retorna x da vertice *MELHORAR*
+        int    retorna_vertices_y( int indice );                          // retorna y da vertice *MELHORAR*
+        int    retorna_vertices_z( int indice );                          // retorna z da vertice *MELHORAR*
+};
+
+struct tipo_camera {                // estrutura com os dados da camera
+    GLfloat posx;                   // posicao x da camera
+    GLfloat posy;                   // posicao y da camera
+    GLfloat posz;                   // posicao z da camera
+    GLfloat alvox;                  // alvo x da visualizacao
+    GLfloat alvoy;                  // alvo y da visualizacao
+    GLfloat alvoz;                  // alvo z da visualizacao
+    GLfloat ang;                    // abertura da 'lente' - efeito de zoom
+    GLfloat inicio;                 // inicio da area de visualizacao em profundidade
+    GLfloat fim;                    // fim da area de visualizacao em profundidade
+};
+
+struct tipo_transformacao{          // estrutura com os dados das transformacoes
+    GLfloat dx, dy, dz;             // paramatros de translacao
+    GLfloat sx, sy, sz;             // parametros de escala
+    GLfloat angx , angy , angz;     // parametros de rotacao
+};
+
+struct tipo_janela{                 // estrutura com os dados das janelas
+    GLfloat largura;                // largura da janela
+    GLfloat altura;                 // altura da jaanela
+    GLfloat aspecto;                // aspecto da janela (relacao entre largura e altura)
+};
+
+struct tipo_luz{                    // estrutura com os dados da iluminacao
+    GLfloat difusa[ 4 ];            // cor e intensidade da luz difusa
+    GLfloat especular[ 4 ];         // cor e intensidade da luz especular
+    GLfloat posicao[ 4 ];           // posicao da fonte de luz
+};
+
+tipo_camera        camera;          // define a perspectiva da camera
+tipo_transformacao transf;          // definicao dos valores de transformacao
+tipo_janela        janela;          // definicao dos janela principal
+tipo_luz           luz;             // definicao de uma fonte de luz
+
+GLfloat especularidade[ 4 ];        // especularidade e brilho do material
+GLfloat ambiente[ 4 ];              // luz ambiente (quando a iluminacao estiver desligada)
+GLint   espec_material;             // brilho
+GLubyte tonalizacao;                // tipo de tonalizacao dos triangulos (flat ou smooth)
+GLint   modo;                       // modo de visualizacao dos objetos (pontos, wireframe ou solido)
+
+bool color , mostra_eixos , ligada; // variaveis que ligam/desligam coloracao do terreno, visualziacao dos eixos x,y,z e iluminacao ligada ou desligada
+
+GLfloat rotX , rotY  , rotX_ini , rotY_ini; // controle do mouse
+GLint   x_ini , y_ini , bot;                // controle do mouse
+
+GLint jan[ JANELAS ], passo_camera , passo_objeto , primitiva; // controle das janelas, passo de atualizacao dos parametros das transformacoes e qual objeto mostrar
+
+/// =======================================================================
 
 FILE       *fp_arquivo;                     // ponteiro para o arquivo
 GLubyte    *nome_arquivo;                   // nome do arquivo da imagem
@@ -117,92 +205,6 @@ void calcula_normal(  GLfloat v1[ 3 ] , GLfloat v2[ 3 ] , GLfloat v3[ 3 ] )
     unitario();
 }
 
-/// =======================================================================
-// atualiza a posicao z da camera em relacao ao tamanho do terreno
-void atualiza_posicao_camera()
-{
-    //configurar a posicao inicial da camera levando em consideracao o tamanho do terreno
-    camera.posz = terreno.largura_superficie()*25;
-    especifica_parametros_visualizacao();
-}
-
-/// =======================================================================
-// le um arquivo bmp e aoca um vetor com todos os valores dos pixels
-int  LoadBMP()
-{
-    #define SAIR        {fclose(fp_arquivo); return -1;}
-    #define CTOI(C)     (*(int*)&C)
-
-    GLubyte Header[0x54];
-    GLint retorno , temp , largura_imagem , altura_imagem;
-
-    // testes para verificar o arquivo
-    if (fread(Header,1,0x36,fp_arquivo)!=0x36) // color table
-    {
-        cout << "ERRO A imagem especificada possui Color Table?" << endl;
-        SAIR;
-    }
-    if (Header[0]!='B' || Header[1]!='M')
-    {
-        cout << "ERRO A imagem especificada nao eh do tipo BMP" << endl;
-        SAIR;
-    }
-    if (CTOI(Header[0x1E])!=0) // 0 = sem compressão
-    {
-        cout << "ERRO A imagem especificada possui compressao" << endl;
-        SAIR;
-    }
-
-    largura_imagem = CTOI(Header[0x12]);
-    altura_imagem  = CTOI(Header[0x16]);
-
-    //terreno.seta_tamanho( altura_imagem , largura_imagem  );    //seta o tamanho do terreno (altura da imagem  = largura da superficie)
-    terreno.seta_tamanho( largura_imagem , altura_imagem  );    //seta o tamanho do terreno (altura da imagem  = largura da superficie)
-                                                                //                          (largura da imagem = largura da superficie)
-
-    //Verifica a profundidade de cores
-    switch( CTOI(Header[0x1C]) )
-    {
-    case 8 :
-        imageSize = largura_imagem * altura_imagem;
-        profundidade_cores = 8;
-        break;
-    case 24 :
-        imageSize = largura_imagem * altura_imagem * 3;
-        profundidade_cores = 24;
-        break;
-    case 32 :
-        imageSize = largura_imagem * altura_imagem * 4;
-        profundidade_cores = 32;
-        break;
-    default:
-        cout << "ERRO A imagem especificada possui profundidade de cores diferente de 8 16 32" << endl;
-        SAIR;
-    }
-
-    // Efetura a Carga da Imagem
-    image = ( GLubyte *) malloc ( imageSize );
-
-    retorno = fread( image , 1 , imageSize , fp_arquivo );
-
-    if ( retorno != (GLint)( imageSize ))
-    {
-        free (image);
-        cout << "ERRO Erro na leitura da quantidade de bytes da imagem especificada" << endl;
-        SAIR;
-    }
-
-    // Inverte os valores de R e B
-    for ( GLint i = 0; i < (GLint)(imageSize); i += (profundidade_cores/8) )
-    {
-        temp       = image[i];
-        image[i]   = image[i+2];
-        image[i+2] = temp;
-    }
-
-    fclose (fp_arquivo);
-    return 1;
-}
 /// =======================================================================
 // cria a matriz terreno com os valores de cada pixel
 int cria_terreno()
@@ -476,6 +478,470 @@ void inicializa( void )
                         ( glutGet( GLUT_SCREEN_HEIGHT ) - ALT_MAIN ) / 2 );
 }
 /// =======================================================================
+// le um arquivo bmp e aoca um vetor com todos os valores dos pixels
+int  LoadBMP()
+{
+    #define SAIR        {fclose(fp_arquivo); return -1;}
+    #define CTOI(C)     (*(int*)&C)
+
+    GLubyte Header[0x54];
+    GLint retorno , temp , largura_imagem , altura_imagem;
+
+    // testes para verificar o arquivo
+    if (fread(Header,1,0x36,fp_arquivo)!=0x36) // color table
+    {
+        cout << "ERRO A imagem especificada possui Color Table?" << endl;
+        SAIR;
+    }
+    if (Header[0]!='B' || Header[1]!='M')
+    {
+        cout << "ERRO A imagem especificada nao eh do tipo BMP" << endl;
+        SAIR;
+    }
+    if (CTOI(Header[0x1E])!=0) // 0 = sem compressão
+    {
+        cout << "ERRO A imagem especificada possui compressao" << endl;
+        SAIR;
+    }
+
+    largura_imagem = CTOI(Header[0x12]);
+    altura_imagem  = CTOI(Header[0x16]);
+
+    //terreno.seta_tamanho( altura_imagem , largura_imagem  );    //seta o tamanho do terreno (altura da imagem  = largura da superficie)
+    terreno.seta_tamanho( largura_imagem , altura_imagem  );    //seta o tamanho do terreno (altura da imagem  = largura da superficie)
+                                                                //                          (largura da imagem = largura da superficie)
+
+    //Verifica a profundidade de cores
+    switch( CTOI(Header[0x1C]) )
+    {
+    case 8 :
+        imageSize = largura_imagem * altura_imagem;
+        profundidade_cores = 8;
+        break;
+    case 24 :
+        imageSize = largura_imagem * altura_imagem * 3;
+        profundidade_cores = 24;
+        break;
+    case 32 :
+        imageSize = largura_imagem * altura_imagem * 4;
+        profundidade_cores = 32;
+        break;
+    default:
+        cout << "ERRO A imagem especificada possui profundidade de cores diferente de 8 16 32" << endl;
+        SAIR;
+    }
+
+    // Efetura a Carga da Imagem
+    image = ( GLubyte *) malloc ( imageSize );
+
+    retorno = fread( image , 1 , imageSize , fp_arquivo );
+
+    if ( retorno != (GLint)( imageSize ))
+    {
+        free (image);
+        cout << "ERRO Erro na leitura da quantidade de bytes da imagem especificada" << endl;
+        SAIR;
+    }
+
+    // Inverte os valores de R e B
+    for ( GLint i = 0; i < (GLint)(imageSize); i += (profundidade_cores/8) )
+    {
+        temp       = image[i];
+        image[i]   = image[i+2];
+        image[i+2] = temp;
+    }
+
+    fclose (fp_arquivo);
+    return 1;
+}
+
+/// =======================================================================
+// Programa Principal
+int main( int argc , char *argv[] )
+{
+    if ( argc != 2 )
+    {
+        cout << "Faltou nome do arquivo a ser aberto" << endl;
+        return 0;
+    }
+    fp_arquivo = fopen(argv[1],"rb");
+    if ( !fp_arquivo )
+    {
+        cout << endl << "Nao pode abrir o arquivo " << argv[1] << endl;
+        return -1;
+    }
+    else
+        cout << endl << "Sucesso na abertura do arquivo " << argv[1] << endl;
+
+    glutInit( &argc , argv );
+
+    glutInitDisplayMode( GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH );
+
+    // janela do help
+    glutInitWindowSize( LAR_HELP , ALT_HELP );
+    glutInitWindowPosition( 300 , 300 );
+    jan[ 0 ] = glutCreateWindow( "HELP" );
+
+    // janela principal
+    glutInitWindowSize( LAR_MAIN , ALT_MAIN );
+    glutInitWindowPosition( ( glutGet( GLUT_SCREEN_WIDTH  ) - LAR_MAIN ) / 2 ,
+                           ( glutGet( GLUT_SCREEN_HEIGHT )  - ALT_MAIN  ) / 2 );
+    jan[ 1 ] = glutCreateWindow( "TERRENO" );
+
+    // callbacks da janela de help
+    glutSetWindow( jan[ 0 ] );
+    glutDisplayFunc( desenha_help );
+    glutReshapeFunc( altera_tamanho_janela_help );
+
+    // callbacks da janela principal
+    glutSetWindow( jan[ 1 ] );
+    glutDisplayFunc( desenha );
+    glutKeyboardFunc( teclado );
+    glutSpecialFunc( teclas_especiais );
+    glutReshapeFunc( altera_tamanho_janela );
+
+    // Funcao callback para eventos de botoes do mouse
+    glutMouseFunc( gerencia_mouse );
+
+    // Funcao callback para eventos de movimento do mouse
+    glutMotionFunc( gerencia_movimento );
+
+    // funcao que tem as inicializacoes de variaveis e estados do OpenGL
+    inicializa();
+
+    if( cria_terreno() == -1)
+        return 0;
+
+    glutMainLoop();
+
+    return 0;
+}
+/// =======================================================================
+void superficie::cria_faces( void )
+{
+    faces = new int * [ (largura-1) * (profundidade-1) * 2 ];
+
+    for( int i = 0 ; i < ( (largura-1) * (profundidade-1) * 2 ) ; i++ )
+        faces[ i ] = new int[ 3 ];
+
+    qtde_faces = ( (largura-1) * (profundidade-1) * 2 );
+}
+
+/// =======================================================================
+void superficie::cria_vertices( void )
+{
+    vertices = new int *[ largura*profundidade ];
+
+    for( int i = 0 ; i < (largura*profundidade) ; i++ )
+        vertices[ i ] = new int[ 3 ];
+
+    qtde_vertices = ( largura * profundidade );
+}
+/// =======================================================================
+
+void superficie::inclui_faces( int indice , int v1 , int v2 , int v3 )
+{
+    faces[ indice ][ 0 ] = v1;
+    faces[ indice ][ 1 ] = v2;
+    faces[ indice ][ 2 ] = v3;
+}
+
+/// =======================================================================
+void  superficie::inclui_vertices( int indice , int x , int y , int z )
+{
+    vertices[ indice ][ 0 ] = x;
+    vertices[ indice ][ 1 ] = y;
+    vertices[ indice ][ 2 ] = z;
+}
+
+/// =======================================================================
+void superficie::destroi_vertices( void )
+{
+    delete vertices;
+    qtde_vertices = 0;
+}
+
+/// =======================================================================
+void superficie::destroi_faces( void )
+{
+    delete faces;
+    qtde_faces = 0;
+}
+
+/// =======================================================================
+int  superficie::valor( int x , int y )
+{
+    return vertices[ x ][ y ];
+}
+
+/// =======================================================================
+void superficie::seta_tamanho( int larg , int prof )
+{
+    largura       = larg;
+    profundidade  = prof;
+}
+
+/// =======================================================================
+int superficie::largura_superficie( void )
+{
+    return largura;
+}
+
+/// =======================================================================
+int superficie::profundidade_superficie( void )
+{
+    return profundidade;
+}
+
+/// =======================================================================
+int superficie::quantidade_faces( void )
+{
+    return qtde_faces;
+}
+
+/// =======================================================================
+int superficie::quantidade_vertices( void )
+{
+    return qtde_vertices;
+}
+
+/// =======================================================================
+int superficie::retorna_faces_v1( int indice )
+{
+    return faces[ indice ][ 0 ];
+}
+
+/// =======================================================================
+int superficie::retorna_faces_v2( int indice )
+{
+    return faces[ indice ][ 1 ];
+}
+
+/// =======================================================================
+int superficie::retorna_faces_v3( int indice )
+{
+    return faces[ indice ][ 2 ];
+}
+
+/// =======================================================================
+int superficie::retorna_vertices_x( int indice )
+{
+    return vertices[ indice ][ 0 ];
+}
+
+/// =======================================================================
+int superficie::retorna_vertices_y( int indice )
+{
+    return vertices[ indice ][ 1 ];
+}
+
+/// =======================================================================
+int superficie::retorna_vertices_z( int indice )
+{
+    return vertices[ indice ][ 2 ];
+}
+
+/// =======================================================================
+// mostra texto na janela
+void mostra_texto_bitmap( GLfloat x , GLfloat y , string texto )
+{
+    glRasterPos2f ( x , y );
+    for( int i = 0 ; i < (int)(texto.length()) ; i++ )
+        glutBitmapCharacter( GLUT_BITMAP_8_BY_13 , texto[ i ] );
+}
+/// =======================================================================
+// mostra a telazinha de help
+void desenha_help(void)
+{
+    glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+
+    glMatrixMode(GL_MODELVIEW);
+    glClear( GL_COLOR_BUFFER_BIT );
+    glColor4f( 1.0 , 1.0 , 0.0 , 1.0 );
+
+    mostra_texto_bitmap( 0 , 210 , "ESC           : finaliza o programa" );
+    mostra_texto_bitmap( 0 , 190 , "M             : alterna entre pontos, wireframe e solido" );
+    mostra_texto_bitmap( 0 , 170 , "L             : liga/desliga iluminacao" );
+    mostra_texto_bitmap( 0 , 150 , "X x Y y Z z   : rotaciona a cena" );
+    mostra_texto_bitmap( 0 , 130 , "C             : liga/desliga coloracao" );
+    mostra_texto_bitmap( 0 , 110 , "E             : exibe/oculta eixos" );
+    mostra_texto_bitmap( 0 ,  90 , "F             : alterna tonalizacao entre flat e smooth" );
+    mostra_texto_bitmap( 0 ,  70 , "W A S D Q \\   : movimenta a camera" );
+    mostra_texto_bitmap( 0 ,  50 , "TECLAS NAVEG. : movimenta a fonte de luz" );
+    mostra_texto_bitmap( 0 ,  30 , "MOUSE         : rotaciona a camera" );
+    mostra_texto_bitmap( 0 ,  10 , "I             : reinicializa" );
+
+    glutSwapBuffers();
+}
+/// =======================================================================
+// Funcao usada para especificar a projecao ortogonal do help
+void especifica_parametros_visualizacao_help( void )
+{
+    // seleciona o tipo de matriz para a projecao
+    glMatrixMode( GL_PROJECTION );
+    // limpa (zera) as matrizes
+    glLoadIdentity();
+    glClearColor( 0.1 , 0.1 , 0.1 , 1.0 );
+    gluOrtho2D(  0 , LAR_HELP , 0 , ALT_HELP );
+}
+/// =======================================================================
+// reorganiza a janela de help quando modificada seu tamanho
+void altera_tamanho_janela_help( GLsizei largura , GLsizei altura )
+{
+    glutInitWindowPosition( 300 , 300 );
+    glutReshapeWindow( LAR_HELP , ALT_HELP );
+    especifica_parametros_visualizacao_help();
+}
+/// =======================================================================
+// define os parametros de iluminacao
+void define_iluminacao( void )
+{
+    // habilita o uso da iluminacao
+    glEnable( GL_LIGHTING );
+
+    // Define a refletância do material
+    glMaterialfv( GL_FRONT_AND_BACK , GL_SPECULAR  , especularidade );
+
+    // Define a concentração do brilho
+    glMateriali(  GL_FRONT_AND_BACK , GL_SHININESS , espec_material );
+
+    // ativa o uso da luz ambiente - caso a luz 0 seja desligada
+    glLightModelfv( GL_LIGHT_MODEL_AMBIENT , ambiente );
+
+    glLightfv( GL_LIGHT0 , GL_AMBIENT  , ambiente );
+    glLightfv( GL_LIGHT0 , GL_DIFFUSE  , luz.difusa );
+    glLightfv( GL_LIGHT0 , GL_SPECULAR , luz.especular );
+    glLightfv( GL_LIGHT0 , GL_POSITION , luz.posicao );
+
+    // habilita a definicao da cor do material a partir da cor corrente
+    glEnable( GL_COLOR_MATERIAL );
+
+    glEnable(GL_AUTO_NORMAL);
+
+    glEnable( GL_LIGHT0 );
+
+    // normaliza os vetores normais
+    glEnable( GL_NORMALIZE );
+
+    // habilita o modelo de colorizacao de Gouraud
+    if ( tonalizacao == 'F' )
+        glShadeModel( GL_FLAT );
+    else
+        glShadeModel( GL_SMOOTH );
+}
+/// =======================================================================
+// configura a perspectiva e posiciona a camera
+void especifica_parametros_visualizacao( void )
+{
+    // seleciona o tipo de matriz para a projecao
+    glMatrixMode( GL_PROJECTION );
+    // limpa (zera) as matrizes
+    glLoadIdentity();
+
+    // Especifica e configura a projecao perspectiva
+    gluPerspective( camera.ang , janela.aspecto , camera.inicio , camera.fim );
+
+    // Especifica sistema de coordenadas do modelo
+    glMatrixMode( GL_MODELVIEW );
+
+    // Inicializa sistema de coordenadas do modelo
+    glLoadIdentity();
+
+    // Especifica posicao da camera (o observador) e do alvo
+    glRotatef( rotX/10.0 , 1 , 0 , 0 );
+    glRotatef( rotY/10.0 , 0 , 1 , 0 );
+
+    gluLookAt( camera.posx , camera.posy , camera.posz , camera.alvox , camera.alvoy , camera.alvoz , 0 , 1 , 0 );
+}
+/// =======================================================================
+// tratamento dos cliques do mouse
+void gerencia_mouse(GLint button, GLint state, GLint x, GLint y)
+{
+    if( state == GLUT_DOWN )
+    {
+        // Salva os parametros atuais
+        x_ini = x;
+        y_ini = y;
+        rotX_ini = rotX;
+        rotY_ini = rotY;
+        bot = button;
+    }
+    else bot = -1;
+}
+/// =======================================================================
+// tratamento do movimento do mouse
+void gerencia_movimento( GLint x , GLint y )
+{
+    GLint deltax, deltay;
+
+    // Botao esquerdo
+    if( bot == GLUT_LEFT_BUTTON )
+    {
+        // Calcula diferencas
+        deltax = x_ini - x;
+        deltay = y_ini - y;
+        // E modifica angulos
+        rotY = rotY_ini - deltax / SENS_ROT;
+        rotX = rotX_ini - deltay / SENS_ROT;
+    }
+    especifica_parametros_visualizacao();
+    glutPostRedisplay();
+}
+/// =======================================================================
+// reorganiza a janela principal quando modificada seu tamanho
+void altera_tamanho_janela( GLsizei largura , GLsizei altura )
+{
+    janela.largura = largura;
+    janela.altura  = altura;
+
+    // Para previnir uma divisao por zero
+    if ( janela.altura == 0 ) janela.altura = 1;
+
+    // Especifica as dimensıes da viewport
+    glViewport( 0 , 0 , janela.largura , janela.altura );
+
+    // Calcula o aspecto
+    janela.aspecto = janela.largura / janela.altura;
+
+    especifica_parametros_visualizacao();
+}
+
+/// =======================================================================
+// tratamento das teclas especiais
+void teclas_especiais( GLint key , GLint x , GLint y )
+{
+    if ( key == GLUT_KEY_LEFT )
+        luz.posicao[ 0 ] -= 50;
+
+    if ( key == GLUT_KEY_RIGHT )
+        luz.posicao[ 0 ] += 50;
+
+    if ( key == GLUT_KEY_PAGE_DOWN )
+        luz.posicao[ 1 ] -= 50;
+
+    if ( key == GLUT_KEY_PAGE_UP )
+        luz.posicao[ 1 ] += 50;
+
+    if ( key == GLUT_KEY_UP )
+        luz.posicao[ 2 ] -= 50;
+
+    if ( key == GLUT_KEY_DOWN )
+        luz.posicao[ 2 ] += 50;
+
+    glutSetWindow( jan[ 1 ] );
+    glutPostRedisplay();
+}
+
+/// =======================================================================
+// atualiza a posicao z da camera em relacao ao tamanho do terreno
+void atualiza_posicao_camera()
+{
+    //configurar a posicao inicial da camera levando em consideracao o tamanho do terreno
+    camera.posz = terreno.largura_superficie()*25;
+    especifica_parametros_visualizacao();
+}
+
+/// =======================================================================
 // tratamento do teclado
 void teclado( GLubyte key , GLint x , GLint y )
 {
@@ -584,67 +1050,5 @@ void teclado( GLubyte key , GLint x , GLint y )
 
     glutSetWindow( jan[ 1 ] );
     glutPostRedisplay();
-}
-
-/// =======================================================================
-// Programa Principal
-int main( int argc , char *argv[] )
-{
-    if ( argc != 2 )
-    {
-        cout << "Faltou nome do arquivo a ser aberto" << endl;
-        return 0;
-    }
-    fp_arquivo = fopen(argv[1],"rb");
-    if ( !fp_arquivo )
-    {
-        cout << endl << "Nao pode abrir o arquivo " << argv[1] << endl;
-        return -1;
-    }
-    else
-        cout << endl << "Sucesso na abertura do arquivo " << argv[1] << endl;
-
-    glutInit( &argc , argv );
-
-    glutInitDisplayMode( GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH );
-
-    // janela do help
-    glutInitWindowSize( LAR_HELP , ALT_HELP );
-    glutInitWindowPosition( 300 , 300 );
-    jan[ 0 ] = glutCreateWindow( "HELP" );
-
-    // janela principal
-    glutInitWindowSize( LAR_MAIN , ALT_MAIN );
-    glutInitWindowPosition( ( glutGet( GLUT_SCREEN_WIDTH  ) - LAR_MAIN ) / 2 ,
-                           ( glutGet( GLUT_SCREEN_HEIGHT )  - ALT_MAIN  ) / 2 );
-    jan[ 1 ] = glutCreateWindow( "TERRENO" );
-
-    // callbacks da janela de help
-    glutSetWindow( jan[ 0 ] );
-    glutDisplayFunc( desenha_help );
-    glutReshapeFunc( altera_tamanho_janela_help );
-
-    // callbacks da janela principal
-    glutSetWindow( jan[ 1 ] );
-    glutDisplayFunc( desenha );
-    glutKeyboardFunc( teclado );
-    glutSpecialFunc( teclas_especiais );
-    glutReshapeFunc( altera_tamanho_janela );
-
-    // Funcao callback para eventos de botoes do mouse
-    glutMouseFunc( gerencia_mouse );
-
-    // Funcao callback para eventos de movimento do mouse
-    glutMotionFunc( gerencia_movimento );
-
-    // funcao que tem as inicializacoes de variaveis e estados do OpenGL
-    inicializa();
-
-    if( cria_terreno() == -1)
-        return 0;
-
-    glutMainLoop();
-
-    return 0;
 }
 
