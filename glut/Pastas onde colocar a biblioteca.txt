@@ -1,0 +1,15 @@
+Considerando que o MinGW foi instalado em C:\Mingw
+
+copiar glut.def    em C:\mingw\lib
+
+copiar glut32.def  em C:\mingw\lib
+
+copiar glut32.lib  em C:\mingw\lib 
+
+copiar libglut.a   em C:\mingw\lib
+
+copiar glut.h      em C:\include\gl
+
+copiar glut32.dll  em c:\windows\system32
+
+copiar glut32.dll  em C:\Windows\SysWOW64 <== PARA QUEM USA WINDOWS 64 BITS

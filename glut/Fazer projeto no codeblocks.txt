@@ -1,0 +1,28 @@
+CRIAR O PROJETO
+
+Menu File 
+Opção New 
+Opção Project
+Selecionar Console aplication
+Dar o nome do projeto e o local onde será criado o arquivo .cbp
+Escolher o compilador
+Terminar
+
+
+CONFIGURAR O PROJETO
+
+Menu Project
+Opção Build Options
+Aba Linker Settings
+Selecione Debug
+
+Adicione estas 4 entradas, usando o botão Add
+
+	glut32
+	opengl32
+	glu32
+	winmm
+
+
+Algumas vezes será necessário colocar também a gdi32
+
